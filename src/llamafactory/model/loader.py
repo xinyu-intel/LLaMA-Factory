@@ -19,7 +19,7 @@ from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForVision2Se
 from trl import AutoModelForCausalLMWithValueHead
 
 from ..extras.logging import get_logger
-from ..extras.misc import count_parameters, skip_check_imports, try_download_model_from_ms
+from ..extras.misc import count_parameters, get_current_device, skip_check_imports, try_download_model_from_ms
 from .adapter import init_adapter
 from .model_utils.misc import register_autoclass
 from .model_utils.mod import convert_pretrained_model_to_mod, load_mod_pretrained_model
@@ -174,6 +174,9 @@ def load_model(
         if vhead_params is not None:
             model.load_state_dict(vhead_params, strict=False)
             logger.info("Loaded valuehead from checkpoint: {}".format(vhead_path))
+
+    if get_current_device() != model.device:
+        model = model.to(get_current_device())
 
     if not is_trainable:
         model.requires_grad_(False)

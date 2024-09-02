@@ -34,10 +34,20 @@ from transformers.utils.versions import require_version
 
 from .logging import get_logger
 
+def is_torch_hpu_available():
+    _HPU_AVAILABLE = True
+    try:
+        import habana_frameworks.torch.hpu as hpu
+    except ImportError as e:
+        _HPU_AVAILABLE = False
+    return _HPU_AVAILABLE
 
-_is_fp16_available = is_torch_npu_available() or is_torch_cuda_available()
+if is_torch_hpu_available():
+    import habana_frameworks.torch.hpu as hpu
+
+_is_fp16_available = is_torch_npu_available() or is_torch_cuda_available() or is_torch_hpu_available()
 try:
-    _is_bf16_available = is_torch_bf16_gpu_available() or (is_torch_npu_available() and torch.npu.is_bf16_supported())
+    _is_bf16_available = is_torch_bf16_gpu_available() or (is_torch_npu_available() and torch.npu.is_bf16_supported()) or is_torch_hpu_available()
 except Exception:
     _is_bf16_available = False
 
@@ -127,6 +137,8 @@ def get_current_device() -> "torch.device":
         device = "mps:{}".format(os.environ.get("LOCAL_RANK", "0"))
     elif is_torch_cuda_available():
         device = "cuda:{}".format(os.environ.get("LOCAL_RANK", "0"))
+    elif is_torch_hpu_available():
+        device = "hpu"
     else:
         device = "cpu"
 
@@ -143,6 +155,8 @@ def get_device_count() -> int:
         return torch.npu.device_count()
     elif is_torch_cuda_available():
         return torch.cuda.device_count()
+    elif is_torch_hpu_available():
+        return hpu.device_count()
     else:
         return 0
 
@@ -164,6 +178,8 @@ def get_peak_memory() -> Tuple[int, int]:
         return torch.npu.max_memory_allocated(), torch.npu.max_memory_reserved()
     elif is_torch_cuda_available():
         return torch.cuda.max_memory_allocated(), torch.cuda.max_memory_reserved()
+    elif is_torch_hpu_available():
+        return hpu.max_memory_allocated(), hpu.max_memory_reserved()
     else:
         return 0, 0
 
@@ -191,7 +207,7 @@ def is_gpu_or_npu_available() -> bool:
     r"""
     Checks if the GPU or NPU is available.
     """
-    return is_torch_npu_available() or is_torch_cuda_available()
+    return is_torch_npu_available() or is_torch_cuda_available() or is_torch_hpu_available()
 
 
 def numpify(inputs: Union["NDArray", "torch.Tensor"]) -> "NDArray":
